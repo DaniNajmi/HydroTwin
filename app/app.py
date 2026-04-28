@@ -29,10 +29,10 @@ df = load_data()
 
 st.title("HydroTwin Monitoring System")
 st.caption(
-    "Interactive aquaponics monitoring system for prediction, anomaly detection, "
-    "state classification, and trust scoring.  \n"
     "Developed by Daniela Najmias Lang"
 )
+st.subheader(    "Interactive aquaponics monitoring system for prediction, anomaly detection, "
+    "state classification, and trust scoring.  \n")
 st.subheader("Ammonia values are shown in PPM (parts per million)")
 
 with st.expander("How to use this dashboard", expanded=True):
