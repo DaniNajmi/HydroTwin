@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
+import os
 
 st.set_page_config(
     page_title="HydroTwin Dashboard",
@@ -10,28 +11,18 @@ st.set_page_config(
 
 @st.cache_data
 def load_data():
-    df = pd.read_csv("data/processed/hydro_twin_app_data.csv")
-
-    # Clean column names
-    df.columns = df.columns.str.strip()
-
-    # If timestamp was saved as index, recover it
-    if "timestamp" not in df.columns:
-        possible_time_cols = [
-            col for col in df.columns
-            if "time" in col.lower() or "date" in col.lower() or "unnamed" in col.lower()
-        ]
-
-        if possible_time_cols:
-            df = df.rename(columns={possible_time_cols[0]: "timestamp"})
-        else:
-            st.error("No timestamp column found. Available columns are:")
-            st.write(df.columns.tolist())
-            st.stop()
-
+    folder = "data/processed/ponds"
+    files = [f for f in os.listdir(folder) if f.endswith(".csv")]
+    
+    dfs = []
+    for file in files:
+        temp = pd.read_csv(os.path.join(folder, file))
+        dfs.append(temp)
+    
+    df = pd.concat(dfs, ignore_index=True)
+    
     df["timestamp"] = pd.to_datetime(df["timestamp"], errors="coerce")
-    df = df.dropna(subset=["timestamp"])
-
+    
     return df.sort_values(["pond_id", "timestamp"]).reset_index(drop=True)
 
 df = load_data()
