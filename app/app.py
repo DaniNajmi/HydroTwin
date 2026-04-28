@@ -1,7 +1,7 @@
+import os
 import streamlit as st
 import pandas as pd
 import plotly.express as px
-import os
 
 st.set_page_config(
     page_title="HydroTwin Dashboard",
@@ -13,16 +13,16 @@ st.set_page_config(
 def load_data():
     folder = "data/processed/ponds"
     files = [f for f in os.listdir(folder) if f.endswith(".csv")]
-    
+
     dfs = []
     for file in files:
         temp = pd.read_csv(os.path.join(folder, file))
         dfs.append(temp)
-    
+
     df = pd.concat(dfs, ignore_index=True)
-    
     df["timestamp"] = pd.to_datetime(df["timestamp"], errors="coerce")
-    
+    df = df.dropna(subset=["timestamp"])
+
     return df.sort_values(["pond_id", "timestamp"]).reset_index(drop=True)
 
 df = load_data()
@@ -30,8 +30,8 @@ df = load_data()
 st.title("HydroTwin Monitoring System")
 st.caption(
     "Interactive aquaponics monitoring system for prediction, anomaly detection, "
-    "state classification, and trust scoring."
-    "\n Developed by Daniela Najmias Lang"
+    "state classification, and trust scoring.  \n"
+    "Developed by Daniela Najmias Lang"
 )
 
 with st.expander("How to use this dashboard", expanded=True):
@@ -43,13 +43,13 @@ with st.expander("How to use this dashboard", expanded=True):
         Use the sidebar to choose which pond/system you want to inspect.
 
         **2. Adjust the residual threshold**  
-        The threshold controls how sensitive the system is to prediction errors.
-        - Lower threshold = more sensitive, more anomalies flagged
-        - Higher threshold = stricter, fewer anomalies flagged
+        The threshold controls how sensitive the system is to prediction errors.  
+        - Lower threshold = more sensitive, more anomalies flagged  
+        - Higher threshold = stricter, fewer anomalies flagged  
 
         **3. Compare anomaly layers**  
-        - **Residual anomalies** show when observed ammonia does not match what the model expected.
-        - **Isolation Forest anomalies** show unusual system behavior across multiple variables.
+        - **Residual anomalies** show when observed ammonia does not match what the model expected.  
+        - **Isolation Forest anomalies** show unusual system behavior across multiple variables.  
         - When both appear together, the system has stronger evidence of abnormal behavior.
 
         **4. Read the system state**  
@@ -57,11 +57,10 @@ with st.expander("How to use this dashboard", expanded=True):
 
         **5. Use the trust score**  
         The trust score summarizes how reliable the current system reading appears.
-        A score near 1 means high confidence. A lower score means the system should be inspected.
         """
     )
 
-# Sidebar
+# Sidebar controls
 st.sidebar.header("System Controls")
 
 ponds = sorted(df["pond_id"].unique())
@@ -81,16 +80,16 @@ show_states = st.sidebar.checkbox("Show system states", True)
 
 df_pond = df[df["pond_id"] == selected_pond].copy().reset_index(drop=True)
 
-# Interactive threshold recalculation
+# Interactive recalculation
 threshold = df_pond["residual_abs"].quantile(threshold_q)
 df_pond["interactive_sensor_flag"] = df_pond["residual_abs"] > threshold
+
+high_ammonia_threshold = df_pond["actual"].quantile(0.90)
 
 def classify_interactive_state(row):
     sensor_flag = row["interactive_sensor_flag"]
     iso_flag = row["iso_flag"]
     ammonia = row["actual"]
-
-    high_ammonia_threshold = df_pond["actual"].quantile(0.90)
 
     if sensor_flag and iso_flag:
         return "CRITICAL"
@@ -106,53 +105,46 @@ def classify_interactive_state(row):
 
 df_pond["interactive_state"] = df_pond.apply(classify_interactive_state, axis=1)
 
-# KPI cards
+st.sidebar.write(
+    f"Residual anomalies flagged: **{int(df_pond['interactive_sensor_flag'].sum())}**"
+)
+
 latest = df_pond.iloc[-1]
 
+# KPI cards
 col1, col2, col3, col4 = st.columns(4)
 
-latest = df_pond.iloc[-1]
 col1.metric("Current State", latest["interactive_state"])
-
 col2.metric("Trust Score", f"{latest['trust_smooth']:.2f}")
 col3.metric("Residual Threshold", f"{threshold:.3f}")
 col4.metric("Residual Flags", int(df_pond["interactive_sensor_flag"].sum()))
-
-# Explanation
-st.info(
-    """
-    HydroTwin compares expected ammonia behavior against observed ammonia. 
-    Large residuals suggest potential sensor-side issues, while Isolation Forest 
-    captures unusual multivariate system behavior. Together, these signals classify 
-    system state and generate an operator-facing trust score.
-    """
-)
 
 with st.expander("What do these metrics mean?"):
     st.markdown(
         """
         **Current State**  
-        The latest operational classification for the selected pond.
+        Latest operational classification for the selected pond.
 
         **Trust Score**  
         A 0–1 reliability score based on prediction error and anomaly flags.
 
         **Residual Threshold**  
-        The current cutoff used to decide whether a prediction error is unusually large.
+        The cutoff used to decide whether a prediction error is unusually large.
 
         **Residual Flags**  
         Number of readings where observed ammonia differed strongly from expected ammonia.
 
         **Actual Ammonia**  
-        The measured ammonia value from the system.
+        The measured ammonia value from the aquaponics system.
 
         **Predicted Ammonia**  
-        The ammonia value Hydro-Twin expected based on learned biological patterns.
+        The ammonia value HydroTwin expected based on learned biological patterns.
 
         **Residual**  
-        The difference between actual and predicted ammonia. Large residuals may indicate sensor drift or unusual biological behavior.
+        Difference between actual and predicted ammonia.
         """
     )
+
 # Actual vs predicted
 st.subheader("Actual vs Predicted Ammonia")
 
@@ -160,13 +152,17 @@ fig_pred = px.line(
     df_pond,
     x="timestamp",
     y=["actual", "predicted"],
-    labels={"value": "Ammonia", "timestamp": "Time", "variable": "Signal"},
+    labels={
+        "value": "Ammonia",
+        "timestamp": "Time",
+        "variable": "Signal"
+    },
     title="Observed vs Expected Ammonia"
 )
 
 st.plotly_chart(fig_pred, use_container_width=True)
 
-# Anomaly detection
+# Anomaly overlay
 st.subheader("Anomaly Detection Layer")
 
 fig_anom = px.line(
@@ -174,7 +170,10 @@ fig_anom = px.line(
     x="timestamp",
     y="actual",
     title="Ammonia with Anomaly Overlays",
-    labels={"actual": "Ammonia", "timestamp": "Time"}
+    labels={
+        "actual": "Ammonia",
+        "timestamp": "Time"
+    }
 )
 
 if show_sensor:
@@ -206,9 +205,19 @@ if show_states:
         x="timestamp",
         y="actual",
         color="interactive_state",
-        labels={"actual": "Ammonia", "timestamp": "Time", "interactive_state": "System State"},
         title="HydroTwin System State Over Time",
-        hover_data=["predicted", "residual_abs", "interactive_sensor_flag", "iso_flag", "trust_smooth"]
+        labels={
+            "actual": "Ammonia",
+            "timestamp": "Time",
+            "interactive_state": "System State"
+        },
+        hover_data=[
+            "predicted",
+            "residual_abs",
+            "interactive_sensor_flag",
+            "iso_flag",
+            "trust_smooth"
+        ]
     )
 
     st.plotly_chart(fig_state, use_container_width=True)
@@ -221,7 +230,10 @@ fig_trust = px.line(
     x="timestamp",
     y="trust_smooth",
     title="Smoothed Trust Score Over Time",
-    labels={"trust_smooth": "Trust Score", "timestamp": "Time"}
+    labels={
+        "trust_smooth": "Trust Score",
+        "timestamp": "Time"
+    }
 )
 
 st.plotly_chart(fig_trust, use_container_width=True)
@@ -229,28 +241,28 @@ st.plotly_chart(fig_trust, use_container_width=True)
 # Decision panel
 st.subheader("Current Operational Interpretation")
 
-current_state = latest["state"]
+current_state = latest["interactive_state"]
 current_trust = latest["trust_smooth"]
 
 if current_state == "Normal":
     st.success(f"System appears stable. Trust score: {current_trust:.2f}")
 
-elif "Sensor" in current_state:
+elif current_state == "Sensor Drift":
     st.warning(
         f"Possible sensor-side issue detected. Trust score: {current_trust:.2f}. "
         "Recommended action: inspect or recalibrate sensor."
     )
 
-elif "Biological" in current_state:
+elif current_state in ["Biological Warning", "Biological Danger"]:
     st.warning(
-        f"Biological risk signal detected. Trust score: {current_trust:.2f}. "
+        f"Biological risk signal detected: {current_state}. Trust score: {current_trust:.2f}. "
         "Recommended action: inspect water quality and system conditions."
     )
 
-elif "CRITICAL" in current_state:
+elif current_state == "CRITICAL":
     st.error(
         f"Critical condition detected. Trust score: {current_trust:.2f}. "
-        "Recommended action: immediate inspection of both sensor reliability and biological condition."
+        "Recommended action: inspect both sensor reliability and biological condition immediately."
     )
 
 else:
