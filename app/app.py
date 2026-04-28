@@ -84,13 +84,39 @@ df_pond = df[df["pond_id"] == selected_pond].copy().reset_index(drop=True)
 # Interactive threshold recalculation
 threshold = df_pond["residual_abs"].quantile(threshold_q)
 df_pond["interactive_sensor_flag"] = df_pond["residual_abs"] > threshold
+st.sidebar.write(
+    f"Residual anomalies flagged: **{int(df_pond['interactive_sensor_flag'].sum())}**"
+)
+
+def classify_interactive_state(row):
+    sensor_flag = row["interactive_sensor_flag"]
+    iso_flag = row["iso_flag"]
+    ammonia = row["actual"]
+
+    high_ammonia_threshold = df_pond["actual"].quantile(0.90)
+
+    if sensor_flag and iso_flag:
+        return "CRITICAL"
+    elif sensor_flag and not iso_flag:
+        return "Sensor Drift"
+    elif not sensor_flag and iso_flag:
+        if ammonia > high_ammonia_threshold:
+            return "Biological Danger"
+        else:
+            return "Biological Warning"
+    else:
+        return "Normal"
+
+df_pond["interactive_state"] = df_pond.apply(classify_interactive_state, axis=1)
 
 # KPI cards
 latest = df_pond.iloc[-1]
 
 col1, col2, col3, col4 = st.columns(4)
 
-col1.metric("Current State", latest["state"])
+latest = df_pond.iloc[-1]
+col1.metric("Current State", latest["interactive_state"])
+
 col2.metric("Trust Score", f"{latest['trust_smooth']:.2f}")
 col3.metric("Residual Threshold", f"{threshold:.3f}")
 col4.metric("Residual Flags", int(df_pond["interactive_sensor_flag"].sum()))
@@ -182,10 +208,10 @@ if show_states:
         df_pond,
         x="timestamp",
         y="actual",
-        color="state",
+        color="interactive_state",
+        labels={"actual": "Ammonia", "timestamp": "Time", "interactive_state": "System State"},
         title="HydroTwin System State Over Time",
-        labels={"actual": "Ammonia", "timestamp": "Time", "state": "System State"},
-        hover_data=["predicted", "residual_abs", "trust_smooth"]
+        hover_data=["predicted", "residual_abs", "interactive_sensor_flag", "iso_flag", "trust_smooth"]
     )
 
     st.plotly_chart(fig_state, use_container_width=True)
