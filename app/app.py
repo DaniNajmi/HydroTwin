@@ -39,8 +39,8 @@ df = load_data()
 st.title("HydroTwin Monitoring System")
 st.caption(
     "Interactive aquaponics monitoring system for prediction, anomaly detection, "
-    "state classification, and trust scoring.
-    Developed by Daniela Najmias Lang"
+    "state classification, and trust scoring."
+    "Developed by Daniela Najmias Lang"
 )
 
 with st.expander("How to use this dashboard", expanded=True):
