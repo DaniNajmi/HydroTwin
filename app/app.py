@@ -11,7 +11,27 @@ st.set_page_config(
 @st.cache_data
 def load_data():
     df = pd.read_csv("data/processed/hydro_twin_app_data.csv")
-    df["timestamp"] = pd.to_datetime(df["timestamp"])
+
+    # Clean column names
+    df.columns = df.columns.str.strip()
+
+    # If timestamp was saved as index, recover it
+    if "timestamp" not in df.columns:
+        possible_time_cols = [
+            col for col in df.columns
+            if "time" in col.lower() or "date" in col.lower() or "unnamed" in col.lower()
+        ]
+
+        if possible_time_cols:
+            df = df.rename(columns={possible_time_cols[0]: "timestamp"})
+        else:
+            st.error("No timestamp column found. Available columns are:")
+            st.write(df.columns.tolist())
+            st.stop()
+
+    df["timestamp"] = pd.to_datetime(df["timestamp"], errors="coerce")
+    df = df.dropna(subset=["timestamp"])
+
     return df.sort_values(["pond_id", "timestamp"]).reset_index(drop=True)
 
 df = load_data()
@@ -21,6 +41,33 @@ st.caption(
     "Interactive aquaponics monitoring system for prediction, anomaly detection, "
     "state classification, and trust scoring."
 )
+
+with st.expander("How to use this dashboard", expanded=True):
+    st.markdown(
+        """
+        This dashboard shows how HydroTwin monitors an aquaponics system.
+
+        **1. Select a pond**  
+        Use the sidebar to choose which pond/system you want to inspect.
+
+        **2. Adjust the residual threshold**  
+        The threshold controls how sensitive the system is to prediction errors.
+        - Lower threshold = more sensitive, more anomalies flagged
+        - Higher threshold = stricter, fewer anomalies flagged
+
+        **3. Compare anomaly layers**  
+        - **Residual anomalies** show when observed ammonia does not match what the model expected.
+        - **Isolation Forest anomalies** show unusual system behavior across multiple variables.
+        - When both appear together, the system has stronger evidence of abnormal behavior.
+
+        **4. Read the system state**  
+        HydroTwin translates technical outputs into operational categories such as Normal, Sensor Drift, Biological Warning, Biological Danger, or Critical.
+
+        **5. Use the trust score**  
+        The trust score summarizes how reliable the current system reading appears.
+        A score near 1 means high confidence. A lower score means the system should be inspected.
+        """
+    )
 
 # Sidebar
 st.sidebar.header("System Controls")
@@ -66,6 +113,31 @@ st.info(
     """
 )
 
+with st.expander("What do these metrics mean?"):
+    st.markdown(
+        """
+        **Current State**  
+        The latest operational classification for the selected pond.
+
+        **Trust Score**  
+        A 0–1 reliability score based on prediction error and anomaly flags.
+
+        **Residual Threshold**  
+        The current cutoff used to decide whether a prediction error is unusually large.
+
+        **Residual Flags**  
+        Number of readings where observed ammonia differed strongly from expected ammonia.
+
+        **Actual Ammonia**  
+        The measured ammonia value from the system.
+
+        **Predicted Ammonia**  
+        The ammonia value Hydro-Twin expected based on learned biological patterns.
+
+        **Residual**  
+        The difference between actual and predicted ammonia. Large residuals may indicate sensor drift or unusual biological behavior.
+        """
+    )
 # Actual vs predicted
 st.subheader("Actual vs Predicted Ammonia")
 
