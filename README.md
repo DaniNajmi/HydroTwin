@@ -1,4 +1,6 @@
 # HydroTwin: Biological Ground Truth for Autonomous Sensor Validation in Controlled Environment Agriculture
+<img width="204" height="88" alt="image" src="https://github.com/user-attachments/assets/cdeaf205-5057-4848-bf0a-c6d69f48b8ac" />
+
 
 Hydro-Twin is a data-driven system designed to monitor aquaponics environments by predicting expected ammonia behavior and detecting anomalies in real time.
 
