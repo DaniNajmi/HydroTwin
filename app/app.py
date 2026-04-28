@@ -31,9 +31,9 @@ st.title("HydroTwin Monitoring System")
 st.caption(
     "Interactive aquaponics monitoring system for prediction, anomaly detection, "
     "state classification, and trust scoring.  \n"
-    "Ammonia values are shown in PPM (parts per million)"
+    "Developed by Daniela Najmias Lang"
 )
-st.subheader("Developed by Daniela Najmias Lang")
+st.subheader("Ammonia values are shown in PPM (parts per million)")
 
 with st.expander("How to use this dashboard", expanded=True):
     st.markdown(
