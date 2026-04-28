@@ -84,9 +84,6 @@ df_pond = df[df["pond_id"] == selected_pond].copy().reset_index(drop=True)
 # Interactive threshold recalculation
 threshold = df_pond["residual_abs"].quantile(threshold_q)
 df_pond["interactive_sensor_flag"] = df_pond["residual_abs"] > threshold
-st.sidebar.write(
-    f"Residual anomalies flagged: **{int(df_pond['interactive_sensor_flag'].sum())}**"
-)
 
 def classify_interactive_state(row):
     sensor_flag = row["interactive_sensor_flag"]
